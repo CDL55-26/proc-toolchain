@@ -229,3 +229,4 @@ gtkwave_lab_test_files/output_files/*
 
 # Testing files
 test/generated/*.json
+test/diff/*
