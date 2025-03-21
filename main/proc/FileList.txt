@@ -19,6 +19,7 @@
 ./checkpoint_files/BS1.v
 ./checkpoint_files/tristate32.v
 ./checkpoint_files/multiplier.v
+./checkpoint_files/hazard_detection_unit.v
 ./checkpoint_files/divider.v
 ./checkpoint_files/mux_2_5bit.v
 ./checkpoint_files/register65.v

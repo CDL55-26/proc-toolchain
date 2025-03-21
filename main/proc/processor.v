@@ -227,7 +227,7 @@ module processor(
         CLA32 PC1_N(PC1_N_out, PC1_N_OVF, DX_Latch_PC, SEX_DX_immediate_wire, 1'b0); //add DX pc +1 with DX immediate
 
             //Mux tree for PC ctrl
-            mux_2 T_rd_mux(T_rd_mux_out, T_rd_mux_select, DX_target, DX_Latch_A); //if 1, choose rd; jr instr
+            mux_2 T_rd_mux(T_rd_mux_out, T_rd_mux_select, DX_target, DX_Latch_A); //if 1, choose rd; jr instr ********Adjust DX_Latch_A for bypass, should be mux output not DX_Latch_A********
             mux_2 B_J_mux(B_J_mux_out, B_J_mux_select, T_rd_mux_out, PC1_N_out); //if 1, choose PC + 1 + N
             mux_2 PC_ctrl_mux(PC_in, PC_ctrl_mux_select, PC_adder_output, B_J_mux_out); //if 1, take the B_J_mux out 
 
