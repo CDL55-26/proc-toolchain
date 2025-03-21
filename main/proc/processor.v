@@ -84,7 +84,7 @@ module processor(
 
     //XM Latch Wires
     wire [127:0] XM_Latch_input, XM_Latch_output;
-    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B;
+    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B, XM_target;
     wire [16:0] XM_immediate_wire;
     wire [4:0] XM_opcode_wire, XM_rd_wire, XM_rs_wire, XM_rt_wire, XM_shamt_wire, XM_ALU_op_wire;
     wire XM_ErrorFlag_Latch_out, XM_ErrorFlag_mux_out;
@@ -121,6 +121,17 @@ module processor(
     wire WB_T_PC1_mux_select, WB_xm_ctrl_mux_select, Reg_WE;
     wire assert_mult, assert_div, multDiv_start, ALU_multDiv_mux_control;
     wire reg_latch_enable;
+
+    // Hazard Detection Unit Wires
+    wire A_WB_XM_Hazard_mux_select, A_WB_XM_BexSetx_mux_select, A_BexSetx_vs_other_Hazard_mux_select;
+    wire ALU_A_Bypass_mux_select, B_WB_XM_Hazard_mux_select, ALU_B_Bypass_mux_select;
+       
+        // ALU A Bypass Mux Outputs
+        wire [31:0] A_WB_XM_Hazard_mux_out, A_WB_XM_BexSetx_mux_out, A_BexSetx_vs_other_Hazard_mux_out, ALU_A_Bypass_mux_out;
+        // ALU B Bypass Mux Outputs
+        wire [31:0] B_WB_XM_Hazard_mux_out, ALU_B_Bypass_mux_out;
+
+
 
     /*Control Signals*/
 
@@ -160,6 +171,22 @@ module processor(
         //either mult or div asserted
         assign multDiv_start = assert_div | assert_mult; //freeze latches when div or mult asserted
         assign reg_latch_enable = ~multDiv_ctrl_DFF_out;
+
+
+        //Hazard Module
+        hazard_detection_unit HDU(
+            .A_WB_XM_Hazard_mux_select(A_WB_XM_Hazard_mux_select),
+            .A_WB_XM_BexSetx_mux_select(A_WB_XM_BexSetx_mux_select),
+            .A_BexSetx_vs_other_Hazard_mux_select(A_BexSetx_vs_other_Hazard_mux_select),
+            .ALU_A_Bypass_mux_select(ALU_A_Bypass_mux_select),
+            .B_WB_XM_Hazard_mux_select(B_WB_XM_Hazard_mux_select),
+            .ALU_B_Bypass_mux_select(ALU_B_Bypass_mux_select),
+            .FD_Latch_Instr(FD_Latch_Instr),
+            .DX_Latch_Instr(DX_Latch_Instr),
+            .XM_Latch_Instr(XM_Latch_Instr),
+            .WB_Latch_Instr(WB_Latch_Instr)
+        );
+
 
     /* Instruction decoders and parsing */
         /* FD Instruction */
@@ -202,6 +229,9 @@ module processor(
             //immediate for i-type
             assign XM_immediate_wire = XM_Latch_Instr[16:0];
 
+            //target for j type
+            assign XM_target = {{5{XM_Latch_Instr[26]}}, XM_Latch_Instr[26:0]}; //sign extend target
+
         /* WB Instructions */
             //parse instructions
             assign WB_opcode_wire = WB_Latch_Instr[31:27];
@@ -227,7 +257,7 @@ module processor(
         CLA32 PC1_N(PC1_N_out, PC1_N_OVF, DX_Latch_PC, SEX_DX_immediate_wire, 1'b0); //add DX pc +1 with DX immediate
 
             //Mux tree for PC ctrl
-            mux_2 T_rd_mux(T_rd_mux_out, T_rd_mux_select, DX_target, DX_Latch_A); //if 1, choose rd; jr instr ********Adjust DX_Latch_A for bypass, should be mux output not DX_Latch_A********
+            mux_2 T_rd_mux(T_rd_mux_out, T_rd_mux_select, DX_target, ALU_A_Bypass_mux_out); //if 1, choose rd; jr instr ********Adjust DX_Latch_A for bypass, should be mux output not DX_Latch_A********
             mux_2 B_J_mux(B_J_mux_out, B_J_mux_select, T_rd_mux_out, PC1_N_out); //if 1, choose PC + 1 + N
             mux_2 PC_ctrl_mux(PC_in, PC_ctrl_mux_select, PC_adder_output, B_J_mux_out); //if 1, take the B_J_mux out 
 
@@ -268,7 +298,7 @@ module processor(
 
 
         /* XM Latch ******************** */
-        assign XM_Latch_input = {DX_Latch_PC, ALU_multDiv_mux_out, DX_Latch_B, DX_Latch_Instr};
+        assign XM_Latch_input = {DX_Latch_PC, ALU_multDiv_mux_out, ALU_B_Bypass_mux_out, DX_Latch_Instr};
 
         //XM Latch
         register128 XM_Latch(XM_Latch_output, XM_Latch_input, reset, reg_latch_enable, ~clock);
@@ -321,30 +351,46 @@ module processor(
         /*ALU Handling*/
 
             assign SEX_DX_immediate_wire = { {15{DX_immediate_wire[16]}}, DX_immediate_wire }; //sign extend the immediate
-            mux_2 B_immediate_mux(B_immediate_mux_out, B_Imm_mux_select, DX_Latch_B, SEX_DX_immediate_wire); //if control is 1 (i-type), choose SEX option
+            mux_2 B_immediate_mux(B_immediate_mux_out, B_Imm_mux_select, ALU_B_Bypass_mux_out, SEX_DX_immediate_wire); //if control is 1 (i-type), choose SEX option
 
             assign R_S_ALU_mux_sel = (DX_opcode_wire == 5'b0); //if the opcode is all zeros, its an R-type, set 1
             mux_2_5bit R_S_ALU_mux(ALU_op_control, R_S_ALU_mux_sel, 5'b0, DX_ALU_op_wire );//if opcode == 0, I-type, only add
 
-            alu execute_ALU(DX_Latch_A, B_immediate_mux_out, ALU_op_control, DX_shamt_wire, execute_ALU_out_wire, execute_isNotEqual, execute_isLessThan, execute_overflow);
+            alu execute_ALU(ALU_A_Bypass_mux_out, B_immediate_mux_out, ALU_op_control, DX_shamt_wire, execute_ALU_out_wire, execute_isNotEqual, execute_isLessThan, execute_overflow);
+
+        /*Bypassing Handling*/
+
+        //ALU A
+        mux_2 A_WB_XM_Hazard_mux(A_WB_XM_Hazard_mux_out, A_WB_XM_Hazard_mux_select, WB_Latch_xOut, XM_Latch_xOut); //select 1 if XM bypass needed
+        mux_2 A_WB_XM_BexSetx_mux(A_WB_XM_BexSetx_mux_out, A_WB_XM_BexSetx_mux_select, WB_target, XM_target); //if select high, take xm target
+
+        mux_2 A_BexSetx_vs_other_Hazard_mux(A_BexSetx_vs_other_Hazard_mux_out, A_BexSetx_vs_other_Hazard_mux_select, A_WB_XM_Hazard_mux_out, A_WB_XM_BexSetx_mux_out );
+
+        mux_2 ALU_A_Bypass_mux(ALU_A_Bypass_mux_out, ALU_A_Bypass_mux_select, DX_Latch_A, A_BexSetx_vs_other_Hazard_mux_out); //ALU_A_Bypass_mux_out now being fed into execute
+
+        //ALU B
+        mux_2 B_WB_XM_Hazard_mux(B_WB_XM_Hazard_mux_out, B_WB_XM_Hazard_mux_select, WB_Latch_xOut, XM_Latch_xOut);
+        mux_2 ALU_B_Bypass_mux(ALU_B_Bypass_mux_out, ALU_B_Bypass_mux_select, DX_Latch_B, B_WB_XM_Hazard_mux_out);
+
+
 
         /*MultDiv Handling*/
         
-        multdiv multDiv_unit(
-            DX_Latch_A, DX_Latch_B,
-            start_mult, start_div, clock,
-            multDiv_out,
-            multDiv_exception, multDiv_dataRDY
-        );
+            multdiv multDiv_unit(
+                ALU_A_Bypass_mux_out, ALU_B_Bypass_mux_out,
+                start_mult, start_div, clock,
+                multDiv_out,
+                multDiv_exception, multDiv_dataRDY
+            );
 
-        //when multDiv asserted, enable dff, latch 1 : reset when multDiv_dataRDY asserted
-        dffe_ref multDiv_ctrl_DFF(multDiv_ctrl_DFF_out, 1'b1, clock, multDiv_start, multDiv_dataRDY);
+            //when multDiv asserted, enable dff, latch 1 : reset when multDiv_dataRDY asserted
+            dffe_ref multDiv_ctrl_DFF(multDiv_ctrl_DFF_out, 1'b1, clock, multDiv_start, multDiv_dataRDY);
 
-        //series DFFs, should enable mult / div for one cycle, reset on data rdy
-        multDiv_assert_unit multDiv_start_unit(start_mult, start_div, assert_mult, assert_div, clock, multDiv_dataRDY);
+            //series DFFs, should enable mult / div for one cycle, reset on data rdy
+            multDiv_assert_unit multDiv_start_unit(start_mult, start_div, assert_mult, assert_div, clock, multDiv_dataRDY);
 
-        //ALU control
-        mux_2 ALU_multDiv_mux(ALU_multDiv_mux_out, ALU_multDiv_mux_control, execute_ALU_out_wire, multDiv_out);
+            //ALU control
+            mux_2 ALU_multDiv_mux(ALU_multDiv_mux_out, ALU_multDiv_mux_control, execute_ALU_out_wire, multDiv_out);
 
     /*Memory Stage*/
 
