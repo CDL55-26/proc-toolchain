@@ -37,6 +37,7 @@
 ./checkpoint_files/register96.v
 ./checkpoint_files/regfile.v
 ./checkpoint_files/counter.v
+./checkpoint_files/mux_2_3bit.v
 ./checkpoint_files/mux_8.v
 ./checkpoint_files/mux_2.v
 ./checkpoint_files/exception_unit.v

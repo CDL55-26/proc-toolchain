@@ -2,9 +2,9 @@ module control(
     input [4:0] FD_opcode_wire, DX_opcode_wire, XM_opcode_wire, WB_opcode_wire,
     input [4:0] DX_rd_wire, DX_rs_wire,
     input [4:0] DX_ALU_op_wire,
-    input [31:0] DX_Latch_A, DX_Latch_B,
+    input [31:0] ALU_A_Bypass_mux_out, ALU_B_Bypass_mux_out,
     output assert_mult, assert_div, ALU_multDiv_mux_control, 
-    output PC_ctrl_mux_select, B_J_mux_select, T_rd_mux_select,
+    output PC_ctrl_mux_select, B_J_mux_select, T_rd_mux_select, Pure_jump_bypass_correction_mux_select,
     output rs_rstatus_mux_select, rs_rd_mux_select, rt_rs_mux_select, rt_rd_mux_select,
     output [4:0] DX_opcode_OR,
     output B_Imm_mux_select, ALU_op_mux,
@@ -43,10 +43,10 @@ module control(
 
     //Control Bits
 
-        alu comp_alu(DX_Latch_A, DX_Latch_B, 5'b00001, 5'b00000, comp_data_result, comp_isNotEqual, comp_isLessThan, comp_overflow);
+        alu comp_alu(ALU_A_Bypass_mux_out, ALU_B_Bypass_mux_out, 5'b00001, 5'b00000, comp_data_result, comp_isNotEqual, comp_isLessThan, comp_overflow);
 
         //1 if a jump or branch
-        assign bext_zero = (DX_Latch_A != 0);
+        assign bext_zero = (ALU_A_Bypass_mux_out != 0);
         assign PC_ctrl_mux_select = (DX_instruction_decoder[1] | DX_instruction_decoder[3] | DX_instruction_decoder[4]) | (bext_zero & DX_instruction_decoder[22]) | (DX_instruction_decoder[2] & comp_isNotEqual) | (DX_instruction_decoder[6] & comp_isLessThan);
 
         //1 if branch 
@@ -54,6 +54,9 @@ module control(
         
         //1 if jr instr 
         assign T_rd_mux_select = DX_instruction_decoder[4];
+
+        //1 if pure jump
+        assign Pure_jump_bypass_correction_mux_select = DX_instruction_decoder[1] || DX_instruction_decoder[3] ;
 
     // Decode Bits
         //1 if bex T instr -> will read reg 30 into RS 
