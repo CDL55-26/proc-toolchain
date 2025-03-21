@@ -81,6 +81,9 @@ module processor(
     wire [31:0] DX_Latch_PC, DX_Latch_A, DX_Latch_B, DX_Latch_Instr, DX_target, DX_Bypass_mux_out;
     wire [16:0] DX_immediate_wire;
     wire [4:0] DX_opcode_wire, DX_rd_wire, DX_rs_wire, DX_rt_wire, DX_shamt_wire, DX_ALU_op_wire;
+    
+    wire [31:0] DX_stalling_mux_out;
+    wire  DX_stalling_mux_select;
 
     //XM Latch Wires
     wire [127:0] XM_Latch_input, XM_Latch_output;
@@ -141,9 +144,7 @@ module processor(
     wire [2:0] Bypassing_Exception_Value_selector_mux_out;
     wire Bypassing_ALU_exception_addi_selector_mux_out;
 
-    //Stalling control
-    wire [31:0] XD_stalling_mux_out;
-    wire DX_stalling_mux_select;
+
 
 
 
@@ -182,8 +183,7 @@ module processor(
             .DX_rs_wire(DX_rs_wire),
             .DX_ALU_op_wire(DX_ALU_op_wire),
             .ALU_A_Bypass_mux_out(ALU_A_Bypass_mux_out),
-            .ALU_B_Bypass_mux_out(ALU_B_Bypass_mux_out),
-            .DX_stalling_mux_select(DX_stalling_mux_select)
+            .ALU_B_Bypass_mux_out(ALU_B_Bypass_mux_out)
         );
         //either mult or div asserted
         assign multDiv_start = assert_div | assert_mult; //freeze latches when div or mult asserted
@@ -206,7 +206,8 @@ module processor(
             .XM_Latch_Instr(XM_Latch_Instr),
             .WB_Latch_Instr(WB_Latch_Instr),
             .XM_ErrorFlag_Latch_out(XM_ErrorFlag_Latch_out),
-            .WB_ErrorFlag_Latch_out(WB_ErrorFlag_Latch_out)
+            .WB_ErrorFlag_Latch_out(WB_ErrorFlag_Latch_out),
+            .DX_stalling_mux_select(DX_stalling_mux_select)
         );
 
 
