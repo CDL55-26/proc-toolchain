@@ -26,11 +26,11 @@ wire [4:0] WB_opcode_wire, WB_rd_wire, WB_rs_wire, WB_rt_wire, WB_shamt_wire, WB
 wire [16:0] WB_immediate_wire;
 wire [31:0] WB_target;
 
-wire ALU_A_XM_Arithmetic_Hazard, ALU_A_XM_Branch_Hazard, ALU_A_XM_JR_Hazard;
-wire ALU_A_WB_Arithmetic_Hazard, ALU_A_WB_Branch_Hazard, ALU_A_WB_JR_Hazard;
+wire ALU_A_XM_Arithmetic_Hazard, ALU_A_XM_Branch_Hazard, ALU_A_XM_Memory_Hazard, ALU_A_XM_JR_Hazard;
+wire ALU_A_WB_Arithmetic_Hazard, ALU_A_WB_Branch_Hazard, ALU_A_WB_Memory_Hazard, ALU_A_WB_JR_Hazard;
 
-wire ALU_B_XM_Arithmetic_Hazard, ALU_B_XM_Branch_Hazard;
-wire ALU_B_WB_Arithmetic_Hazard, ALU_B_WB_Branch_Hazard;
+wire ALU_B_XM_Arithmetic_Hazard, ALU_B_XM_Branch_Hazard, ALU_B_XM_Memory_Hazard;
+wire ALU_B_WB_Arithmetic_Hazard, ALU_B_WB_Branch_Hazard, ALU_B_WB_Memory_Hazard;
 
 wire ALU_A_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_A_Bypass_mux_or_EXCEPTION_mux_Branch, ALU_A_Bypass_mux_or_EXCEPTION_mux_JR, ALU_A_Bypass_mux_or_EXCEPTION_mux_BEX;
 wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION_mux_Branch;
@@ -101,9 +101,10 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
     //A_DX_XM_Hazard_mux
     assign ALU_A_XM_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));
     assign ALU_A_XM_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rd_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for branch rd goes into Alu A
+    assign ALU_A_XM_Memory_Hazard = ((DX_opcode_wire==5'd7) || (DX_opcode_wire==5'd8)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
     assign ALU_A_XM_JR_Hazard = (DX_opcode_wire==5'd4) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rd_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for jr rd is the A output  
     
-    assign A_WB_XM_Hazard_mux_select = (ALU_A_XM_Arithmetic_Hazard | ALU_A_XM_Branch_Hazard | ALU_A_XM_JR_Hazard); //1 if taking bypass from XM
+    assign A_WB_XM_Hazard_mux_select = (ALU_A_XM_Arithmetic_Hazard | ALU_A_XM_Branch_Hazard | ALU_A_XM_Memory_Hazard| ALU_A_XM_JR_Hazard); //1 if taking bypass from XM
 
     //A_BexSetx_vs_other_Hazard_mux
     assign A_BexSetx_vs_other_Hazard_mux_select = ((DX_opcode_wire==5'd22) && (XM_opcode_wire == 5'd21)&& (XM_target != 32'd0)) || (((DX_opcode_wire==5'd22) && (WB_opcode_wire == 5'd21) && (WB_target != 32'd0))); //if setx infront != 0
@@ -111,10 +112,11 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
     //ALU_A_Bypass_mux
     assign ALU_A_WB_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rs_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));
     assign ALU_A_WB_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rd_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for branch rd goes into Alu A
+    assign ALU_A_WB_Memory_Hazard = ((DX_opcode_wire==5'd7) || (DX_opcode_wire==5'd8)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rs_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
     assign ALU_A_WB_JR_Hazard = (DX_opcode_wire==5'd4) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rd_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for jr rd is the A output
   
 
-    assign ALU_A_Bypass_mux_select = A_WB_XM_Hazard_mux_select | (ALU_A_WB_Arithmetic_Hazard|ALU_A_WB_Branch_Hazard|ALU_A_WB_JR_Hazard) | A_BexSetx_vs_other_Hazard_mux_select;
+    assign ALU_A_Bypass_mux_select = A_WB_XM_Hazard_mux_select | (ALU_A_WB_Arithmetic_Hazard | ALU_A_WB_Branch_Hazard | ALU_A_WB_Memory_Hazard | ALU_A_WB_JR_Hazard) | A_BexSetx_vs_other_Hazard_mux_select;
 
     //ALU_A_Bypass_mux OR EXCEPTION
 
@@ -126,16 +128,19 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
     
     assign ALU_A_Bypass_mux_or_EXCEPTION_mux_select = ALU_A_Bypass_mux_or_EXCEPTION_mux_Arithmetic || ALU_A_Bypass_mux_or_EXCEPTION_mux_Branch || ALU_A_Bypass_mux_or_EXCEPTION_mux_JR || ALU_A_Bypass_mux_or_EXCEPTION_mux_BEX;
 
-
+/*ALU B*/
     //B_DX_XM_Hazard_mux
     assign ALU_B_XM_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rt_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rt_wire==5'd31)));
     assign ALU_B_XM_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));//for branch rd goes into Alu A
- 
-    assign B_WB_XM_Hazard_mux_select = ALU_B_XM_Arithmetic_Hazard | ALU_B_XM_Branch_Hazard;
+    assign ALU_B_XM_Memory_Hazard = ((DX_opcode_wire==5'd7)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rd_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
+
+    assign B_WB_XM_Hazard_mux_select = ALU_B_XM_Arithmetic_Hazard | ALU_B_XM_Branch_Hazard | ALU_B_XM_Memory_Hazard;
 
     //ALU_B_Bypass_mux
     assign ALU_B_WB_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rt_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rt_wire==5'd31)));
     assign ALU_B_WB_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rs_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));//for branch rd goes into Alu A
+    assign ALU_B_WB_Memory_Hazard = ((DX_opcode_wire==5'd7)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rd_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
+
 
     assign ALU_B_Bypass_mux_select = B_WB_XM_Hazard_mux_select | (ALU_B_WB_Arithmetic_Hazard|ALU_B_WB_Branch_Hazard);
 
