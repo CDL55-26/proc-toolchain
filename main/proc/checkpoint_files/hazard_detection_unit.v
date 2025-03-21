@@ -6,6 +6,9 @@ module hazard_detection_unit(
     output ALU_B_Bypass_mux_select,
     output ALU_A_Bypass_mux_or_EXCEPTION_mux_select,
     output ALU_B_Bypass_mux_or_EXCEPTION_mux_select,
+    output A_WB_xOut_data_bypassing_mux_select, 
+    output B_WB_xOut_data_bypassing_mux_select,
+    output DX_stalling_mux_select,
     input [31:0] FD_Latch_Instr, DX_Latch_Instr, XM_Latch_Instr, WB_Latch_Instr,
     input XM_ErrorFlag_Latch_out, WB_ErrorFlag_Latch_out
 );
@@ -95,10 +98,28 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
             assign WB_target = {{5{WB_Latch_Instr[26]}}, WB_Latch_Instr[26:0]}; //sign extend target
 
 
+/*Control for stalling*/
+    //dx_stalling_mux
+
+    
+    assign DX_stalling_mux_select = (DX_opcode_wire == 5'd8) && (
+    ((FD_opcode_wire == 5'd0) && ((FD_rs_wire == DX_rd_wire) || (FD_rs_wire == DX_rd_wire))) ||
+    ((FD_opcode_wire == 5'd5) && (FD_rs_wire == DX_rd_wire)) ||
+    (((FD_opcode_wire == 5'd7) || (FD_opcode_wire == 5'd8)) && (FD_rs_wire == DX_rd_wire)) ||
+    (((FD_opcode_wire == 5'd2) || (FD_opcode_wire == 5'd6)) &&
+     ((FD_rd_wire == DX_rd_wire) || (FD_rs_wire == DX_rd_wire))) ||
+    ((FD_opcode_wire == 5'd4) && (FD_rd_wire == DX_rd_wire))
+);
+
+
 
 /*Control For ALU input A*/
 
-    //A_DX_XM_Hazard_mux
+
+    //A_WB_xOut_data_bypassing_mux
+    assign A_WB_xOut_data_bypassing_mux_select = (WB_opcode_wire == 5'd8);
+
+    //A_DX_XM_Hazard_mux ****XM CHECKS****
     assign ALU_A_XM_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));
     assign ALU_A_XM_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rd_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for branch rd goes into Alu A
     assign ALU_A_XM_Memory_Hazard = ((DX_opcode_wire==5'd7) || (DX_opcode_wire==5'd8)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
@@ -109,7 +130,7 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
     //A_BexSetx_vs_other_Hazard_mux
     assign A_BexSetx_vs_other_Hazard_mux_select = ((DX_opcode_wire==5'd22) && (XM_opcode_wire == 5'd21)&& (XM_target != 32'd0)) || (((DX_opcode_wire==5'd22) && (WB_opcode_wire == 5'd21) && (WB_target != 32'd0))); //if setx infront != 0
 
-    //ALU_A_Bypass_mux
+    //ALU_A_Bypass_mux ***WB CHECKS****
     assign ALU_A_WB_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rs_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));
     assign ALU_A_WB_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rd_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));//for branch rd goes into Alu A
     assign ALU_A_WB_Memory_Hazard = ((DX_opcode_wire==5'd7) || (DX_opcode_wire==5'd8)) && ((((WB_opcode_wire==5'd0)||(WB_opcode_wire==5'd5)) && (DX_rs_wire==WB_rd_wire)) || ((WB_opcode_wire==5'd3) && (DX_rd_wire==5'd31)));
@@ -129,6 +150,10 @@ wire ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic, ALU_B_Bypass_mux_or_EXCEPTION
     assign ALU_A_Bypass_mux_or_EXCEPTION_mux_select = ALU_A_Bypass_mux_or_EXCEPTION_mux_Arithmetic || ALU_A_Bypass_mux_or_EXCEPTION_mux_Branch || ALU_A_Bypass_mux_or_EXCEPTION_mux_JR || ALU_A_Bypass_mux_or_EXCEPTION_mux_BEX;
 
 /*ALU B*/
+
+    //A_WB_xOut_data_bypassing_mux
+    assign B_WB_xOut_data_bypassing_mux_select = (WB_opcode_wire == 5'd8);
+
     //B_DX_XM_Hazard_mux
     assign ALU_B_XM_Arithmetic_Hazard = ((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rt_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rt_wire==5'd31)));
     assign ALU_B_XM_Branch_Hazard = ((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && ((((XM_opcode_wire==5'd0)||(XM_opcode_wire==5'd5)) && (DX_rs_wire==XM_rd_wire)) || ((XM_opcode_wire==5'd3) && (DX_rs_wire==5'd31)));//for branch rd goes into Alu A
