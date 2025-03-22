@@ -87,10 +87,13 @@ module processor(
 
     //XM Latch Wires
     wire [127:0] XM_Latch_input, XM_Latch_output;
-    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B, XM_target;
+    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B, XM_target, RAM_data_bypass_mux_out;
     wire [16:0] XM_immediate_wire;
     wire [4:0] XM_opcode_wire, XM_rd_wire, XM_rs_wire, XM_rt_wire, XM_shamt_wire, XM_ALU_op_wire;
     wire XM_ErrorFlag_Latch_out, XM_ErrorFlag_mux_out;
+    wire RAM_data_bypass_mux_select;
+
+    
 
     //WB Latch Wires
     wire [127:0] WB_Latch_input, WB_Latch_output;
@@ -201,6 +204,7 @@ module processor(
             .ALU_B_Bypass_mux_select(ALU_B_Bypass_mux_select),
             .ALU_A_Bypass_mux_or_EXCEPTION_mux_select(ALU_A_Bypass_mux_or_EXCEPTION_mux_select),
             .ALU_B_Bypass_mux_or_EXCEPTION_mux_select(ALU_B_Bypass_mux_or_EXCEPTION_mux_select),
+            .RAM_data_bypass_mux_select(RAM_data_bypass_mux_select),
             .FD_Latch_Instr(FD_Latch_Instr),
             .DX_Latch_Instr(DX_Latch_Instr),
             .XM_Latch_Instr(XM_Latch_Instr),
@@ -436,7 +440,8 @@ module processor(
     /*Memory Stage*/
 
         assign address_dmem = XM_Latch_xOut; //should be the computed address $rs + N
-        assign data = XM_Latch_B; //should be B, which should be $rd
+        mux_2 RAM_data_bypass_mux(RAM_data_bypass_mux_out, RAM_data_bypass_mux_select, XM_Latch_B, WB_Latch_dOut ); //bypass dmem if sw after lw
+        assign data = RAM_data_bypass_mux_out; //should be B, which should be $rd
         assign wren = RAM_WE;
 
 

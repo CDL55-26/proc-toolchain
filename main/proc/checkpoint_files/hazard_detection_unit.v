@@ -9,6 +9,7 @@ module hazard_detection_unit(
     output A_WB_xOut_data_bypassing_mux_select, 
     output B_WB_xOut_data_bypassing_mux_select,
     output DX_stalling_mux_select,
+    output RAM_data_bypass_mux_select,
     input [31:0] FD_Latch_Instr, DX_Latch_Instr, XM_Latch_Instr, WB_Latch_Instr,
     input XM_ErrorFlag_Latch_out, WB_ErrorFlag_Latch_out
 );
@@ -189,5 +190,9 @@ assign ALU_B_Bypass_mux_select = B_WB_XM_Hazard_mux_select
 assign ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic = (((DX_opcode_wire==5'd0)||(DX_opcode_wire==5'd5)) && (XM_ErrorFlag_Latch_out||WB_ErrorFlag_Latch_out) && (DX_rt_wire==5'd30)); //30 for error register
 assign ALU_B_Bypass_mux_or_EXCEPTION_mux_Branch = (((DX_opcode_wire==5'd2)||(DX_opcode_wire==5'd6)) && (XM_ErrorFlag_Latch_out||WB_ErrorFlag_Latch_out) && (DX_rs_wire==5'd30)); //check rd for branches
 assign ALU_B_Bypass_mux_or_EXCEPTION_mux_select = ALU_B_Bypass_mux_or_EXCEPTION_mux_Arithmetic || ALU_B_Bypass_mux_or_EXCEPTION_mux_Branch;
+
+
+//Memory Bypass - sw after lw
+assign RAM_data_bypass_mux_select = (XM_opcode_wire == 5'd7) && (WB_opcode_wire == 5'd8) && (XM_rd_wire == WB_rd_wire); //if lw in WB and sw using lw's data in xm
 
 endmodule
