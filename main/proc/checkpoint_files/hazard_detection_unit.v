@@ -79,7 +79,7 @@ assign WB_target = {{5{WB_Latch_Instr[26]}}, WB_Latch_Instr[26:0]};
 
 /*Control for stalling*/
 assign DX_stalling_mux_select = (DX_opcode_wire == 5'd8) && (DX_rd_wire != 5'd0) && (
-    ((FD_opcode_wire == 5'd0) && ((FD_rs_wire == DX_rd_wire) || (FD_rs_wire == DX_rd_wire))) ||
+    ((FD_opcode_wire == 5'd0) && ((FD_rs_wire == DX_rd_wire) || (FD_rt_wire == DX_rd_wire))) ||
     ((FD_opcode_wire == 5'd5) && (FD_rs_wire == DX_rd_wire)) ||
     (((FD_opcode_wire == 5'd7) || (FD_opcode_wire == 5'd8)) && (FD_rs_wire == DX_rd_wire)) ||
     (((FD_opcode_wire == 5'd2) || (FD_opcode_wire == 5'd6)) && ((FD_rd_wire == DX_rd_wire) || (FD_rs_wire == DX_rd_wire))) ||
