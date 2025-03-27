@@ -81,13 +81,19 @@ module processor(
     wire [31:0] DX_Latch_PC, DX_Latch_A, DX_Latch_B, DX_Latch_Instr, DX_target, DX_Bypass_mux_out;
     wire [16:0] DX_immediate_wire;
     wire [4:0] DX_opcode_wire, DX_rd_wire, DX_rs_wire, DX_rt_wire, DX_shamt_wire, DX_ALU_op_wire;
+    
+    wire [31:0] DX_stalling_mux_out;
+    wire  DX_stalling_mux_select;
 
     //XM Latch Wires
     wire [127:0] XM_Latch_input, XM_Latch_output;
-    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B, XM_target;
+    wire [31:0] XM_Latch_PC, XM_Latch_Instr, XM_Latch_xOut, XM_Latch_B, XM_target, RAM_data_bypass_mux_out;
     wire [16:0] XM_immediate_wire;
     wire [4:0] XM_opcode_wire, XM_rd_wire, XM_rs_wire, XM_rt_wire, XM_shamt_wire, XM_ALU_op_wire;
     wire XM_ErrorFlag_Latch_out, XM_ErrorFlag_mux_out;
+    wire RAM_data_bypass_mux_select;
+
+    
 
     //WB Latch Wires
     wire [127:0] WB_Latch_input, WB_Latch_output;
@@ -127,17 +133,21 @@ module processor(
     wire B_WB_XM_Hazard_mux_select, ALU_B_Bypass_mux_select, ALU_B_Bypass_mux_or_EXCEPTION_mux_select;
 
     // ALU A Bypass Mux Outputs
-    wire [31:0] A_WB_XM_Hazard_mux_out, A_WB_XM_BexSetx_mux_out, A_BexSetx_vs_other_Hazard_mux_out;
+    wire [31:0] A_WB_XM_Hazard_mux_out, A_WB_XM_BexSetx_mux_out, A_BexSetx_vs_other_Hazard_mux_out, A_WB_xOut_data_bypassing_mux_out;
     wire [31:0] ALU_A_Bypass_mux_out, ALU_A_Bypass_mux_or_EXCEPTION_mux_out;
     wire [31:0] Bypassing_ALU_exception_addi_mux_out;
+    wire A_WB_xOut_data_bypassing_mux_select;
 
     // ALU B Bypass Mux Outputs
-    wire [31:0] B_WB_XM_Hazard_mux_out, ALU_B_Bypass_mux_out, ALU_B_Bypass_mux_or_EXCEPTION_mux_out;
+    wire [31:0] B_WB_XM_Hazard_mux_out, ALU_B_Bypass_mux_out, ALU_B_Bypass_mux_or_EXCEPTION_mux_out, B_WB_xOut_data_bypassing_mux_out;
     wire [31:0] Bypassing_Exception_Value_mux_out;
+    wire B_WB_xOut_data_bypassing_mux_select;
 
     //Bypassing Exception Control
     wire [2:0] Bypassing_Exception_Value_selector_mux_out;
     wire Bypassing_ALU_exception_addi_selector_mux_out;
+
+
 
 
 
@@ -185,6 +195,8 @@ module processor(
 
         //Hazard Module
         hazard_detection_unit HDU(
+            .A_WB_xOut_data_bypassing_mux_select(A_WB_xOut_data_bypassing_mux_select),
+            .B_WB_xOut_data_bypassing_mux_select(B_WB_xOut_data_bypassing_mux_select),
             .A_WB_XM_Hazard_mux_select(A_WB_XM_Hazard_mux_select),
             .A_BexSetx_vs_other_Hazard_mux_select(A_BexSetx_vs_other_Hazard_mux_select),
             .ALU_A_Bypass_mux_select(ALU_A_Bypass_mux_select),
@@ -192,12 +204,14 @@ module processor(
             .ALU_B_Bypass_mux_select(ALU_B_Bypass_mux_select),
             .ALU_A_Bypass_mux_or_EXCEPTION_mux_select(ALU_A_Bypass_mux_or_EXCEPTION_mux_select),
             .ALU_B_Bypass_mux_or_EXCEPTION_mux_select(ALU_B_Bypass_mux_or_EXCEPTION_mux_select),
+            .RAM_data_bypass_mux_select(RAM_data_bypass_mux_select),
             .FD_Latch_Instr(FD_Latch_Instr),
             .DX_Latch_Instr(DX_Latch_Instr),
             .XM_Latch_Instr(XM_Latch_Instr),
             .WB_Latch_Instr(WB_Latch_Instr),
             .XM_ErrorFlag_Latch_out(XM_ErrorFlag_Latch_out),
-            .WB_ErrorFlag_Latch_out(WB_ErrorFlag_Latch_out)
+            .WB_ErrorFlag_Latch_out(WB_ErrorFlag_Latch_out),
+            .DX_stalling_mux_select(DX_stalling_mux_select)
         );
 
 
@@ -264,7 +278,7 @@ module processor(
     /* Program Counter */
 
         //setup PC
-        register PC_register(PC_output, PC_in, reset, reg_latch_enable, ~clock ); //rising edge, always enabled
+        register PC_register(PC_output, PC_in, reset, (reg_latch_enable & ~DX_stalling_mux_select), ~clock ); //rising edge, always enabled
 
         CLA32 PC_adder(PC_adder_output, PC_adder_OVF, PC_output, 32'b1, 1'b0); //carry in zero
         CLA32 PC1_N(PC1_N_out, PC1_N_OVF, DX_Latch_PC, SEX_DX_immediate_wire, 1'b0); //add DX pc +1 with DX immediate
@@ -288,19 +302,19 @@ module processor(
         
         assign FD_Latch_input = {PC_adder_output, FD_Bypass_mux_out}; //uper 32 bits = PC + 1, will use for control later
 
-        register64 FD_Latch(FD_Latch_output, FD_Latch_input, reset, reg_latch_enable, ~clock); //enable to latch always 1, falling edge reg
+        register64 FD_Latch(FD_Latch_output, FD_Latch_input, reset, (reg_latch_enable & ~DX_stalling_mux_select), ~clock); //enable to latch always 1, falling edge reg
 
         assign FD_Latch_PC = FD_Latch_output[63:32];
         assign FD_Latch_Instr = FD_Latch_output[31:0];
-
 
 
         /* DX Latch ********************* */
         //Upper 32b should be PC from FD_Latch_output, lower 32b should be instr passed from FD latch
 
         mux_2 DX_Bypass_mux(DX_Bypass_mux_out, PC_ctrl_mux_select, FD_Latch_Instr, 32'b0); //if taken branch, flush instr with nop
-
-        assign DX_Latch_input = {FD_Latch_PC, data_readRegA, data_readRegB, DX_Bypass_mux_out};
+                                                                          
+                                                                            
+        assign DX_Latch_input = {FD_Latch_PC, data_readRegA, data_readRegB, DX_stalling_mux_out};
 
         //DX Latch
         register128 DX_Latch(DX_Latch_output, DX_Latch_input, reset, reg_latch_enable, ~clock); //enable to latch always 1, falling edge reg
@@ -309,6 +323,8 @@ module processor(
         assign DX_Latch_A = DX_Latch_output[95:64];
         assign DX_Latch_PC = DX_Latch_output[127:96];
 
+        //Stalling Logic
+        mux_2 DX_stalling_mux(DX_stalling_mux_out, DX_stalling_mux_select, DX_Bypass_mux_out, 32'b0 ); 
 
 
         /* XM Latch ******************** */
@@ -375,7 +391,9 @@ module processor(
         /*Bypassing Handling*/
 
         //ALU A
-        mux_2 A_WB_XM_Hazard_mux(A_WB_XM_Hazard_mux_out, A_WB_XM_Hazard_mux_select, WB_Latch_xOut, XM_Latch_xOut); //select 1 if XM bypass needed
+        mux_2 A_WB_xOut_data_bypassing_mux(A_WB_xOut_data_bypassing_mux_out, A_WB_xOut_data_bypassing_mux_select, WB_Latch_xOut, WB_Latch_dOut);
+
+        mux_2 A_WB_XM_Hazard_mux(A_WB_XM_Hazard_mux_out, A_WB_XM_Hazard_mux_select, A_WB_xOut_data_bypassing_mux_out, XM_Latch_xOut); //select 1 if XM bypass needed
 
         mux_2 A_BexSetx_vs_other_Hazard_mux(A_BexSetx_vs_other_Hazard_mux_out, A_BexSetx_vs_other_Hazard_mux_select, A_WB_XM_Hazard_mux_out, DX_target );
 
@@ -384,7 +402,10 @@ module processor(
         mux_2 ALU_A_Bypass_mux_or_EXCEPTION_mux(ALU_A_Bypass_mux_or_EXCEPTION_mux_out, ALU_A_Bypass_mux_or_EXCEPTION_mux_select, ALU_A_Bypass_mux_out, Bypassing_ALU_exception_addi_mux_out);//if 1, exception ahead, take that 
 
         //ALU B
-        mux_2 B_WB_XM_Hazard_mux(B_WB_XM_Hazard_mux_out, B_WB_XM_Hazard_mux_select, WB_Latch_xOut, XM_Latch_xOut);
+
+        mux_2 B_WB_xOut_data_bypassing_mux(B_WB_xOut_data_bypassing_mux_out, B_WB_xOut_data_bypassing_mux_select, WB_Latch_xOut, WB_Latch_dOut);
+                                                                                                   
+        mux_2 B_WB_XM_Hazard_mux(B_WB_XM_Hazard_mux_out, B_WB_XM_Hazard_mux_select, B_WB_xOut_data_bypassing_mux_out, XM_Latch_xOut); 
         mux_2 ALU_B_Bypass_mux(ALU_B_Bypass_mux_out, ALU_B_Bypass_mux_select, DX_Latch_B, B_WB_XM_Hazard_mux_out);
 
         mux_2 ALU_B_Bypass_mux_or_EXCEPTION_mux(ALU_B_Bypass_mux_or_EXCEPTION_mux_out, ALU_B_Bypass_mux_or_EXCEPTION_mux_select, ALU_B_Bypass_mux_out, Bypassing_ALU_exception_addi_mux_out);//if 1, exception ahead, take that 
@@ -419,7 +440,8 @@ module processor(
     /*Memory Stage*/
 
         assign address_dmem = XM_Latch_xOut; //should be the computed address $rs + N
-        assign data = XM_Latch_B; //should be B, which should be $rd
+        mux_2 RAM_data_bypass_mux(RAM_data_bypass_mux_out, RAM_data_bypass_mux_select, XM_Latch_B, WB_Latch_dOut ); //bypass dmem if sw after lw
+        assign data = RAM_data_bypass_mux_out; //should be B, which should be $rd
         assign wren = RAM_WE;
 
 

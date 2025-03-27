@@ -56,7 +56,7 @@ module control(
         assign T_rd_mux_select = DX_instruction_decoder[4];
 
         //1 if pure jump
-        assign Pure_jump_bypass_correction_mux_select = DX_instruction_decoder[1] || DX_instruction_decoder[3] ;
+        assign Pure_jump_bypass_correction_mux_select = DX_instruction_decoder[1] || DX_instruction_decoder[3] || DX_instruction_decoder[22] ;
 
     // Decode Bits
         //1 if bex T instr -> will read reg 30 into RS 
