@@ -395,7 +395,7 @@ module processor(
 
         mux_2 A_WB_XM_Hazard_mux(A_WB_XM_Hazard_mux_out, A_WB_XM_Hazard_mux_select, A_WB_xOut_data_bypassing_mux_out, XM_Latch_xOut); //select 1 if XM bypass needed
 
-        mux_2 A_BexSetx_vs_other_Hazard_mux(A_BexSetx_vs_other_Hazard_mux_out, A_BexSetx_vs_other_Hazard_mux_select, A_WB_XM_Hazard_mux_out, DX_target );
+        mux_2 A_BexSetx_vs_other_Hazard_mux(A_BexSetx_vs_other_Hazard_mux_out, A_BexSetx_vs_other_Hazard_mux_select, A_WB_XM_Hazard_mux_out, DX_target ); //some jump?
 
         mux_2 ALU_A_Bypass_mux(ALU_A_Bypass_mux_out, ALU_A_Bypass_mux_select, DX_Latch_A, A_BexSetx_vs_other_Hazard_mux_out); //ALU_A_Bypass_mux_out now being fed into execute
         //Adding mux to the front because easier, not pretty
